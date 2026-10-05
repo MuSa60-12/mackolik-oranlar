@@ -1,0 +1,45 @@
+name: Acilis Tarama
+
+on:
+  schedule:
+    - cron: '5 0 * * *'   # her gün 00:05 UTC (Türkiye saatiyle 03:05, yaz saati 02:05)
+  workflow_dispatch:       # Actions sekmesinden elle de tetiklenebilir
+
+permissions:
+  contents: write
+
+jobs:
+  acilis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install -r requirements.txt
+
+      - name: Veritabanını önbellekten geri yükle
+        uses: actions/cache@v4
+        with:
+          path: mackolik_oran.db
+          key: mackolik-db-${{ github.run_id }}
+          restore-keys: |
+            mackolik-db-
+
+      - name: Acilis tara
+        run: python acilis_tara.py
+
+      - name: Excel ciktisini commitle
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add oranlar_yaklasan.xlsx oranlar_tamamlanan.xlsx
+          if git diff --staged --quiet; then
+            echo "Degisiklik yok."
+          else
+            git commit -m "Acilis guncelleme $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git pull --rebase origin "$GITHUB_REF_NAME" || true
+            git push
+          fi
